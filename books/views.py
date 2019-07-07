@@ -21,12 +21,11 @@ class BooksCreateRead(View):
             return JsonResponse({
                 "status_code": 400,
                 "status": "Failed"
-            })
-        book = models.Book(name=name, isbn=isbn, country=country, number_of_pages=number_of_pages,
-                           publisher=publisher, release_date=release_date)
-        book.save()
+            }, status=400)
+        book = models.Book.objects.create(name=name, isbn=isbn, country=country, number_of_pages=number_of_pages,
+                                          publisher=publisher, release_date=release_date)
         for author in authors:
-            models.Author(book=book, name=author).save()
+            models.Author.objects.create(book=book, name=author)
         return JsonResponse({
             "status_code": 201,
             "status": "success",
@@ -41,7 +40,7 @@ class BooksCreateRead(View):
                     "release_date": release_date
                 }}
             ]
-        })
+        }, status=201)
 
     def get(self, request):
         filtered_books = models.Book.objects.all()
@@ -79,14 +78,7 @@ class BooksCreateRead(View):
 
 
 class BooksUpdateDeleteFetch(View):
-    def patch(self, request):
-        try:
-            book_id = self.kwargs['book_id']
-        except KeyError:
-            return JsonResponse({
-                "status_code": 400,
-                "status": "failed"
-            })
+    def patch(self, request, book_id):
         try:
             book = models.Book.objects.get(id=book_id)
         except models.Book.DoesNotExist:
@@ -94,7 +86,7 @@ class BooksUpdateDeleteFetch(View):
                 "status_code": 404,
                 "status": "failed",
                 "message": "Book does not exist"
-            })
+            }, status=404)
 
         params = json.loads(request.body)
         if 'name' in params:
@@ -113,7 +105,7 @@ class BooksUpdateDeleteFetch(View):
 
         if 'authors' in params:
             models.Author.objects.filter(book=book).delete()
-            for author in params['author']:
+            for author in params['authors']:
                 models.Author(book=book, name=author).save()
         return JsonResponse({
             "status_code": 200,
@@ -131,14 +123,7 @@ class BooksUpdateDeleteFetch(View):
             }
         })
 
-    def delete(self, request):
-        try:
-            book_id = self.kwargs['book_id']
-        except KeyError:
-            return JsonResponse({
-                "status_code": 400,
-                "status": "failed"
-            })
+    def delete(self, request, book_id):
         try:
             book = models.Book.objects.get(id=book_id)
         except models.Book.DoesNotExist:
@@ -146,7 +131,7 @@ class BooksUpdateDeleteFetch(View):
                 "status_code": 404,
                 "status": "failed",
                 "message": "Book does not exist"
-            })
+            }, status=404)
         name = book.name
         book.delete()
         return JsonResponse({
@@ -156,14 +141,7 @@ class BooksUpdateDeleteFetch(View):
             "data": []
         })
 
-    def get(self, request):
-        try:
-            book_id = self.kwargs['book_id']
-        except KeyError:
-            return JsonResponse({
-                "status_code": 400,
-                "status": "failed"
-            })
+    def get(self, request, book_id):
         try:
             book = models.Book.objects.get(id=book_id)
         except models.Book.DoesNotExist:
@@ -171,7 +149,7 @@ class BooksUpdateDeleteFetch(View):
                 "status_code": 404,
                 "status": "failed",
                 "message": "Book does not exist"
-            })
+            }, status=404)
         return JsonResponse({
             "status_code": 200,
             "status": "success",
@@ -190,25 +168,24 @@ class BooksUpdateDeleteFetch(View):
 
 def get_external_books(request):
     try:
-        name = request.GET.get('name')
+        name = request.GET['name']
     except KeyError:
         return JsonResponse({
             "status_code": 400,
             "status": "failed"
-        })
+        }, status=400)
     url = "https://www.anapioficeandfire.com/api/books"
-    response = requests.get(url, params={'name': name})
-    book_list = json.loads(response)
+    book_list = requests.get(url, params={'name': name}).json()
     data = []
     for book in book_list:
         data.append({
-            "name": book.name,
-            "isbn": book.isbn,
-            "authors": book.authors,
-            "number_of_pages": book.number_of_pages,
-            "publisher": book.publisher,
-            "country": book.country,
-            "release_date": book.release_date
+            "name": book.get('name'),
+            "isbn": book.get('isbn'),
+            "authors": book.get('authors'),
+            "number_of_pages": book.get('number_of_pages'),
+            "publisher": book.get('publisher'),
+            "country": book.get('country'),
+            "release_date": book.get('release_date')
         })
     return JsonResponse({
         "status_code": 200,
